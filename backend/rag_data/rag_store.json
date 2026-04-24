@@ -1,0 +1,369 @@
+{
+  "selectors": [
+    {
+      "description": "Google search box",
+      "selector": "textarea[name='q']",
+      "url_pattern": "google.com",
+      "success_count": 12,
+      "last_used": "2026-04-23T15:16:09.577831"
+    },
+    {
+      "description": "Google search input",
+      "selector": "input[name='q']",
+      "url_pattern": "google.com",
+      "success_count": 9,
+      "last_used": "2026-04-23T15:16:09.578838"
+    },
+    {
+      "description": "Google Images tab",
+      "selector": "a[href*='tbm=isch']",
+      "url_pattern": "google.com",
+      "success_count": 10,
+      "last_used": "2026-04-23T15:16:09.578838"
+    },
+    {
+      "description": "Google search button",
+      "selector": "input[value='Google Search']",
+      "url_pattern": "google.com",
+      "success_count": 9,
+      "last_used": "2026-04-23T15:16:09.579838"
+    },
+    {
+      "description": "Amazon search box",
+      "selector": "input[id='twotabsearchtextbox']",
+      "url_pattern": "amazon.in",
+      "success_count": 9,
+      "last_used": "2026-04-23T15:16:09.581177"
+    },
+    {
+      "description": "Amazon search button",
+      "selector": "input[id='nav-search-submit-button']",
+      "url_pattern": "amazon.in",
+      "success_count": 9,
+      "last_used": "2026-04-23T15:16:09.581177"
+    },
+    {
+      "description": "Amazon add to cart",
+      "selector": "input[id='add-to-cart-button']",
+      "url_pattern": "amazon.in",
+      "success_count": 9,
+      "last_used": "2026-04-23T15:16:09.583394"
+    },
+    {
+      "description": "Amazon buy now",
+      "selector": "input[id='buy-now-button']",
+      "url_pattern": "amazon.in",
+      "success_count": 9,
+      "last_used": "2026-04-23T15:16:09.583394"
+    },
+    {
+      "description": "Generic submit button",
+      "selector": "button[type='submit']",
+      "url_pattern": "*",
+      "success_count": 9,
+      "last_used": "2026-04-23T15:16:09.584349"
+    },
+    {
+      "description": "Generic search input",
+      "selector": "input[type='search']",
+      "url_pattern": "*",
+      "success_count": 9,
+      "last_used": "2026-04-23T15:16:09.584349"
+    },
+    {
+      "description": "Generic text input",
+      "selector": "input[type='text']",
+      "url_pattern": "*",
+      "success_count": 9,
+      "last_used": "2026-04-23T15:16:09.585829"
+    },
+    {
+      "description": "Click first image",
+      "selector": "img.Q4LuWd",
+      "url_pattern": "google.com",
+      "success_count": 1,
+      "last_used": "2026-04-23T14:09:35.556101"
+    }
+  ],
+  "workflows": [
+    {
+      "instruction": "go to ggogle search for forbes and search for lionel messi and download his image",
+      "steps": [
+        {
+          "action": "navigate",
+          "description": "Navigate to Google",
+          "url": "https://www.google.com"
+        },
+        {
+          "action": "wait",
+          "description": "Wait for Google to load",
+          "duration": 2000
+        },
+        {
+          "action": "fill",
+          "description": "Search for 'forbes'",
+          "selector": "textarea[name='q']",
+          "value": "forbes"
+        },
+        {
+          "action": "press",
+          "description": "Submit search",
+          "key": "Enter"
+        },
+        {
+          "action": "wait",
+          "description": "Wait for results",
+          "duration": 3000
+        },
+        {
+          "action": "click",
+          "description": "Click Images tab",
+          "selector": "a[href*='tbm=isch']"
+        },
+        {
+          "action": "wait",
+          "description": "Wait for images",
+          "duration": 2000
+        },
+        {
+          "action": "click",
+          "description": "Click first image",
+          "selector": "img.Q4LuWd"
+        },
+        {
+          "action": "wait",
+          "description": "Wait for image view",
+          "duration": 2000
+        },
+        {
+          "action": "download",
+          "description": "Download image"
+        }
+      ],
+      "success": false,
+      "timestamp": "2026-04-23T14:09:45.934384",
+      "use_count": 1,
+      "domain": ""
+    },
+    {
+      "instruction": "go to google search for forbes and search for lionel messi and download his image",
+      "steps": [
+        {
+          "action": "navigate",
+          "description": "Navigate to Google",
+          "url": "https://www.google.com"
+        },
+        {
+          "action": "wait",
+          "description": "Wait for Google to load",
+          "duration": 2000
+        },
+        {
+          "action": "fill",
+          "description": "Search for 'forbes'",
+          "selector": "textarea[name='q']",
+          "value": "forbes"
+        },
+        {
+          "action": "press",
+          "description": "Submit search",
+          "key": "Enter"
+        },
+        {
+          "action": "wait",
+          "description": "Wait for results",
+          "duration": 3000
+        },
+        {
+          "action": "click",
+          "description": "Click Images tab",
+          "selector": "a[href*='tbm=isch']"
+        },
+        {
+          "action": "wait",
+          "description": "Wait for images",
+          "duration": 2000
+        },
+        {
+          "action": "click",
+          "description": "Click first image",
+          "selector": "img.Q4LuWd"
+        },
+        {
+          "action": "wait",
+          "description": "Wait for image view",
+          "duration": 2000
+        },
+        {
+          "action": "download",
+          "description": "Download image"
+        }
+      ],
+      "success": false,
+      "timestamp": "2026-04-23T14:10:13.360901",
+      "use_count": 1,
+      "domain": "google"
+    },
+    {
+      "instruction": "go to google.com search for \"Forbes list 2026\" and then search for \"Lionel Messi\" in that forbes list Search bar",
+      "steps": [
+        {
+          "action": "navigate",
+          "description": "Navigate to Google.com",
+          "selector": null,
+          "value": null,
+          "url": "https://www.google.com",
+          "key": null,
+          "assertion_type": null,
+          "expected": null,
+          "duration": 2000,
+          "direction": null,
+          "amount": null
+        },
+        {
+          "action": "fill",
+          "description": "Fill search box with 'Forbes list 2026'",
+          "selector": "input[name='q']",
+          "value": "Forbes list 2026",
+          "url": null,
+          "key": null,
+          "assertion_type": null,
+          "expected": null,
+          "duration": 2000,
+          "direction": null,
+          "amount": null
+        },
+        {
+          "action": "press",
+          "description": "Press Enter to submit search query",
+          "selector": null,
+          "value": null,
+          "url": null,
+          "key": "Enter",
+          "assertion_type": null,
+          "expected": null,
+          "duration": 3000,
+          "direction": null,
+          "amount": null
+        },
+        {
+          "action": "wait",
+          "description": "Wait for page to settle",
+          "selector": null,
+          "value": null,
+          "url": null,
+          "key": null,
+          "assertion_type": null,
+          "expected": null,
+          "duration": 2000,
+          "direction": null,
+          "amount": null
+        },
+        {
+          "action": "fill",
+          "description": "Fill search box with 'Lionel Messi'",
+          "selector": "input[name='q']",
+          "value": "Forbes list 2026",
+          "url": null,
+          "key": null,
+          "assertion_type": null,
+          "expected": null,
+          "duration": 2000,
+          "direction": null,
+          "amount": null
+        },
+        {
+          "action": "press",
+          "description": "Press Enter to submit search query",
+          "selector": null,
+          "value": null,
+          "url": null,
+          "key": "Enter",
+          "assertion_type": null,
+          "expected": null,
+          "duration": 3000,
+          "direction": null,
+          "amount": null
+        },
+        {
+          "action": "wait",
+          "description": "Wait for page to settle",
+          "selector": null,
+          "value": null,
+          "url": null,
+          "key": null,
+          "assertion_type": null,
+          "expected": null,
+          "duration": 2000,
+          "direction": null,
+          "amount": null
+        }
+      ],
+      "success": false,
+      "timestamp": "2026-04-23T14:26:03.570081",
+      "use_count": 1,
+      "domain": "google"
+    },
+    {
+      "instruction": "Search for \"Lionel Messi\" on Forbes website",
+      "steps": [
+        {
+          "action": "navigate",
+          "description": "Navigate to Forbes website",
+          "selector": null,
+          "value": "",
+          "url": "https://www.forbes.com/",
+          "key": null,
+          "assertion_type": null,
+          "expected": null,
+          "duration": 2000,
+          "direction": null,
+          "amount": null
+        },
+        {
+          "action": "wait",
+          "description": "Wait for page to settle",
+          "selector": null,
+          "value": "",
+          "url": null,
+          "key": null,
+          "assertion_type": null,
+          "expected": null,
+          "duration": 2000,
+          "direction": null,
+          "amount": null
+        },
+        {
+          "action": "fill",
+          "description": "Fill search box with Lionel Messi",
+          "selector": "input[name='q']",
+          "value": "Lionel Messi",
+          "url": null,
+          "key": null,
+          "assertion_type": null,
+          "expected": null,
+          "duration": 2000,
+          "direction": null,
+          "amount": null
+        },
+        {
+          "action": "press",
+          "description": "Press Enter to submit search",
+          "selector": null,
+          "value": "",
+          "url": null,
+          "key": "Enter",
+          "assertion_type": null,
+          "expected": null,
+          "duration": 3000,
+          "direction": null,
+          "amount": null
+        }
+      ],
+      "success": false,
+      "timestamp": "2026-04-23T14:27:23.100988",
+      "use_count": 1,
+      "domain": ""
+    }
+  ]
+}

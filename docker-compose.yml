@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Backend API Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-testing-agent-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=False
+      - BROWSER_HEADLESS=True
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_MODEL=llama3
+    volumes:
+      - ./backend/screenshots:/app/screenshots
+      - ./backend/reports:/app/reports
+    depends_on:
+      - ollama
+    networks:
+      - testing-network
+    restart: unless-stopped
+
+  # Ollama LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-testing-agent-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - testing-network
+    restart: unless-stopped
+    # Note: After first run, you need to pull the model:
+    # docker exec -it ai-testing-agent-ollama ollama pull llama3
+
+  # Frontend Web Server (nginx)
+  frontend:
+    image: nginx:alpine
+    container_name: ai-testing-agent-frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - testing-network
+    restart: unless-stopped
+
+volumes:
+  ollama-data:
+    driver: local
+
+networks:
+  testing-network:
+    driver: bridge

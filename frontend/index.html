@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LLM Driven Autonomous Web Testing Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ============== TOP BAR ============== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <span class="brand-bracket">[</span>
+        <span class="brand-glyph">◆</span>
+        <span class="brand-bracket">]</span>
+      </div>
+      <div class="brand-text">
+        <h1 class="brand-title">LLM Driven Autonomous Web Testing Agent</h1>
+        <p class="brand-sub">Plain-English instructions → automated browser tests</p>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div class="health-badge" id="healthBadge" title="Backend status">
+        <span class="health-dot" id="healthDot"></span>
+        <span class="health-text" id="healthText">Checking…</span>
+      </div>
+      <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+        <span class="theme-icon-dark">☾</span>
+        <span class="theme-icon-light">☀</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============== NAV TABS ============== -->
+  <nav class="main-nav">
+    <button class="nav-tab active" data-view="tests">
+      <span class="nav-icon">🧪</span><span>Tests</span>
+    </button>
+    <button class="nav-tab" data-view="history">
+      <span class="nav-icon">📋</span><span>History</span>
+    </button>
+  </nav>
+
+  <!-- ============== TESTS VIEW ============== -->
+  <main class="view active" id="view-tests">
+    <!-- Session tabs strip -->
+    <div class="session-strip">
+      <div class="session-tabs" id="sessionTabs">
+        <!-- session tabs injected here -->
+      </div>
+      <button class="new-session-btn" id="newSessionBtn" title="New test">
+        <span>+</span><span>New</span>
+      </button>
+    </div>
+
+    <!-- Session content area -->
+    <section class="session-area" id="sessionArea">
+      <!-- Welcome / new test view (default) -->
+      <div class="welcome-screen" id="welcomeScreen">
+        <div class="welcome-inner">
+          <h2 class="welcome-title">What would you like to test?</h2>
+          <p class="welcome-sub">Describe any browser test in plain English. The agent will plan it, run it, and screenshot every step.</p>
+
+          <div class="example-grid">
+            <button class="example-chip" data-prompt="Go to google.com and search for 'best laptops 2025'">
+              <span class="chip-tag">SEARCH</span>
+              <span class="chip-text">Search Google for best laptops 2025</span>
+            </button>
+            <button class="example-chip" data-prompt="Open amazon.in, search for 'coffee machine', click the first result, and add it to cart">
+              <span class="chip-tag">E-COMMERCE</span>
+              <span class="chip-text">Amazon: search coffee machine, add to cart</span>
+            </button>
+            <button class="example-chip" data-prompt="Go to google.com, search for 'taj mahal', click the Images tab, then click the first image">
+              <span class="chip-tag">IMAGES</span>
+              <span class="chip-text">Google Images: Taj Mahal, open first photo</span>
+            </button>
+            <button class="example-chip" data-prompt="Visit wikipedia.org and search for 'quantum computing'">
+              <span class="chip-tag">RESEARCH</span>
+              <span class="chip-text">Wikipedia search for quantum computing</span>
+            </button>
+            <button class="example-chip" data-prompt="Open github.com and search for 'playwright python'">
+              <span class="chip-tag">DEV</span>
+              <span class="chip-text">GitHub search for playwright python</span>
+            </button>
+            <button class="example-chip" data-prompt="Go to youtube.com and search for 'lofi beats'">
+              <span class="chip-tag">MEDIA</span>
+              <span class="chip-text">YouTube search for lofi beats</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Running screen -->
+      <div class="running-screen hidden" id="runningScreen">
+        <div class="running-orb">
+          <div class="orb-ring r1"></div>
+          <div class="orb-ring r2"></div>
+          <div class="orb-ring r3"></div>
+          <div class="orb-core">◆</div>
+        </div>
+        <h3 class="running-title">Executing test…</h3>
+        <p class="running-sub" id="runningSub">Generating plan and launching browser</p>
+      </div>
+
+      <!-- Result screen -->
+      <div class="result-screen hidden" id="resultScreen">
+        <div class="verdict-banner" id="verdictBanner">
+          <div class="verdict-icon" id="verdictIcon">✓</div>
+          <div class="verdict-body">
+            <div class="verdict-title" id="verdictTitle">PASS</div>
+            <div class="verdict-meta" id="verdictMeta">— steps · — duration</div>
+          </div>
+          <div class="verdict-actions">
+            <button class="ghost-btn" id="deleteSessionBtn" title="Delete this session">
+              <span>🗑</span><span>Delete</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="result-instruction" id="resultInstruction"></div>
+
+        <div class="result-grid">
+          <!-- Steps panel -->
+          <section class="panel">
+            <header class="panel-head">
+              <h4 class="panel-title">Execution steps</h4>
+              <span class="panel-count" id="stepsCount">0</span>
+            </header>
+            <div class="steps-list" id="stepsList"></div>
+          </section>
+
+          <!-- Screenshots panel -->
+          <section class="panel">
+            <header class="panel-head">
+              <h4 class="panel-title">Screenshots</h4>
+              <span class="panel-count" id="shotsCount">0</span>
+            </header>
+            <div class="shots-grid" id="shotsGrid"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== FIXED INPUT BAR ============== -->
+    <div class="input-dock">
+      <div class="input-dock-inner">
+        <div class="input-row-top">
+          <input
+            type="text"
+            class="url-input"
+            id="urlInput"
+            placeholder="Optional start URL (e.g. https://amazon.in)"
+            autocomplete="off"
+          />
+          <label class="toggle">
+            <input type="checkbox" id="forceFreshToggle" />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">Force fresh plan</span>
+          </label>
+        </div>
+
+        <div class="input-row-main">
+          <textarea
+            id="instructionInput"
+            class="instruction-input"
+            placeholder="Describe what to test… e.g. 'Go to amazon.in, search for coffee machine, click the first result, add to cart'"
+            rows="2"
+          ></textarea>
+
+          <div class="input-actions">
+            <button class="mic-btn" id="micBtn" title="Voice input" aria-label="Voice input">
+              <span class="mic-icon">🎤</span>
+              <span class="mic-pulse"></span>
+            </button>
+            <button class="run-btn" id="runBtn" title="Run test (Ctrl+Enter)">
+              <span class="run-icon">▶</span>
+              <span class="run-label">Run Test</span>
+              <span class="run-spinner hidden"></span>
+            </button>
+          </div>
+        </div>
+        <div class="input-hint">
+          <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run</span>
+          <span class="dot-sep">·</span>
+          <span id="sessionCountHint">0 active sessions</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============== HISTORY VIEW ============== -->
+  <main class="view" id="view-history">
+    <div class="history-header">
+      <div>
+        <h2 class="view-title">Test history</h2>
+        <p class="view-sub">All past test runs from the backend</p>
+      </div>
+      <button class="ghost-btn" id="refreshHistoryBtn">
+        <span>↻</span><span>Refresh</span>
+      </button>
+    </div>
+    <div class="history-list" id="historyList">
+      <div class="empty-state">Loading…</div>
+    </div>
+  </main>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Lightbox -->
+  <div class="lightbox hidden" id="lightbox">
+    <button class="lightbox-close" id="lightboxClose">×</button>
+    <img id="lightboxImg" alt="Screenshot" />
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

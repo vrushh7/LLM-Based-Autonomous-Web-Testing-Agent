@@ -1057,3 +1057,161 @@ kbd {
   pointer-events: none;
 }
 .shot-card { position: relative; }
+/* FIX 5: Ensure CSS file ends properly with all required styles */
+
+/* ---------- Scrollbars ---------- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-hi);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* ---------- Product grid styles ---------- */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.product-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  transition: all 0.15s;
+}
+
+.product-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.product-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.product-price {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.product-rating {
+  font-size: 11px;
+  color: var(--text-mid);
+  margin-bottom: 4px;
+}
+
+.product-source {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ---------- Downloads grid ---------- */
+.downloads-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* ---------- Goal badge ---------- */
+.goal-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--pass-soft);
+  color: var(--pass);
+  letter-spacing: 0.05em;
+}
+
+/* ---------- Site badge ---------- */
+.site-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  margin-right: 8px;
+}
+
+/* ---------- Hidden utility ---------- */
+.hidden {
+  display: none !important;
+}
+
+/* ---------- Responsive additions ---------- */
+@media (max-width: 980px) {
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .input-row-main {
+    flex-direction: column;
+  }
+
+  .input-actions {
+    width: 100%;
+  }
+
+  .run-btn,
+  .mic-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar,
+  .main-nav,
+  .view,
+  .input-dock {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .welcome-title {
+    font-size: 28px;
+  }
+
+  .session-area {
+    padding: 18px;
+  }
+
+  .history-card-top {
+    flex-direction: column;
+  }
+
+  .shots-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+  
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -59,3 +59,11 @@ yarn.lock
 
 # Docker
 .dockerignore
+# AI Agent runtime data
+.venv/
+backend/test_runs/
+backend/rag_data/chromadb/
+backend/downloads/
+backend/logs/
+backend/screenshots/
+backend/reports/

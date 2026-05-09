@@ -1,20 +1,15 @@
 """
-Step Schema Validation
-----------------------
-Single source of truth for what a valid step looks like.
+Step Schema Validation — v4.0
+Single source of truth for valid step structure.
+
+VALID_ACTIONS mirrors automation_engine._execute_step exactly:
+  Basic browser, ecommerce (search/sort/filter/click/variant/qty/cart/buy),
+  images, youtube, login, monitoring, flights, human-input.
 
 Public API:
     validate_and_repair_plan(plan_dict, instruction="") -> (clean_plan, issues)
 
-`clean_plan` is ALWAYS a dict with at least one safe step (never raises).
-`issues` is a list of human-readable validation messages (may be empty).
-
-Goals:
-- Reject/repair malformed steps BEFORE they reach the automation engine.
-- Guarantee navigate steps always have a valid absolute URL.
-- Guarantee fill/click/etc. have non-empty selectors.
-- Enforce the Google-Images "search → click images tab → wait → click image → (download)"
-  flow when the instruction asks for images.
+Always returns a dict with at least one safe step. Never raises.
 """
 
 from __future__ import annotations
@@ -27,32 +22,70 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+# ── Constants ─────────────────────────────────────────────────────────────────
 
-VALID_ACTIONS = set(getattr(config, "VALID_ACTIONS", [
-    "navigate", "click", "fill", "press", "wait",
-    "assert", "download", "scroll", "hover", "select", "extract",
-]))
+VALID_ACTIONS = {
+    # Basic browser
+    "navigate", "click", "fill", "press", "wait", "assert",
+    "scroll", "hover", "select", "extract", "type", "download",
+    # Ecommerce – search & sort
+    "search", "apply_sort", "auto_sort",
+    "apply_price_filter", "apply_rating_filter",
+    # Ecommerce – product selection
+    "click_product_index", "click_product_name",
+    "select_variant", "select_quantity",
+    # Ecommerce – cart / buy
+    "add_to_cart", "buy_now", "get_products", "smart_find_and_add_best",
+    # Images
+    "search_images", "click_google_image", "download_highres",
+    # YouTube
+    "youtube_search", "youtube_interact",
+    # Login
+    "smart_login",
+    # Flights
+    "compare_flights",
+    # Monitoring
+    "start_monitoring", "check_monitors", "stop_monitoring",
+    # Human input
+    "request_human_input", "provide_human_input",
+    # Legacy alias kept for RAG compatibility
+    "search_products",
+}
 
-DEFAULT_NAVIGATE_URL = getattr(config, "DEFAULT_NAVIGATE_URL", "https://www.google.com")
+DEFAULT_NAVIGATE_URL: str = getattr(config, "DEFAULT_NAVIGATE_URL", "https://www.google.com")
 
-# Actions that MUST carry a non-empty selector
+# Actions that MUST have a non-empty selector
 SELECTOR_REQUIRED = {"click", "fill", "assert", "hover", "select", "extract"}
 
-# Reasonable per-action defaults applied during repair
-ACTION_DEFAULTS = {
-    "wait": {"duration": 2000},
-    "press": {"key": "Enter"},
-    "scroll": {"direction": "down", "amount": 300},
-    "assert": {"assertion_type": "visible"},
+# Sane per-action defaults applied during repair
+ACTION_DEFAULTS: Dict[str, Dict] = {
+    "wait":                   {"duration": 2000},
+    "press":                  {"key": "Enter"},
+    "scroll":                 {"direction": "down", "amount": 300},
+    "assert":                 {"assertion_type": "visible"},
+    "search":                 {"platform": "amazon"},
+    "search_products":        {"platform": "amazon"},
+    "apply_sort":             {"sort_type": "rating",  "platform": "amazon"},
+    "auto_sort":              {"platform": "amazon"},
+    "apply_price_filter":     {"max_price": 999999, "min_price": 0, "platform": "amazon"},
+    "apply_rating_filter":    {"min_rating": 4.0,   "platform": "amazon"},
+    "click_product_index":    {"index": 1,  "platform": "amazon"},
+    "click_product_name":     {"platform": "amazon"},
+    "select_variant":         {"platform": "amazon"},
+    "select_quantity":        {"quantity": 1, "platform": "amazon"},
+    "add_to_cart":            {"quantity": 1, "platform": "amazon"},
+    "buy_now":                {"quantity": 1, "platform": "amazon"},
+    "smart_find_and_add_best":{"min_rating": 0.0, "limit": 20, "platform": "amazon"},
+    "click_google_image":     {"index": 1},
+    "youtube_search":         {"skip_shorts": True},
+    "youtube_interact":       {"interaction": "like"},
+    "compare_flights":        {"origin": "DEL", "destination": "BOM", "date": "tomorrow"},
+    "start_monitoring":       {"monitors": []},
+    "request_human_input":    {"prompt": "Human input required"},
 }
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _is_blank(value: Any) -> bool:
     return value is None or (isinstance(value, str) and not value.strip())
@@ -66,36 +99,44 @@ def _normalize_url(url: str) -> Optional[str]:
         return None
     if not url.startswith(("http://", "https://")):
         url = "https://" + url.lstrip("/")
-    # Reject obviously bogus values
     if "." not in url.split("//", 1)[-1]:
         return None
     return url
 
 
 def _detect_intent_url(instruction: str) -> str:
-    """Pick a sensible default URL from the instruction's domain hints."""
     if not instruction:
         return DEFAULT_NAVIGATE_URL
-    instr = instruction.lower()
-    if "amazon" in instr:
-        return "https://www.amazon.in"
-    if "youtube" in instr:
-        return "https://www.youtube.com"
-    if "wikipedia" in instr:
-        return "https://www.wikipedia.org"
-    if "bing" in instr:
-        return "https://www.bing.com"
+    il = instruction.lower()
+    if "amazon"    in il: return "https://www.amazon.in"
+    if "flipkart"  in il: return "https://www.flipkart.com"
+    if "youtube"   in il: return "https://www.youtube.com"
+    if "wikipedia" in il: return "https://www.wikipedia.org"
+    if "bing"      in il: return "https://www.bing.com"
+    if "makemytrip"in il or "flight" in il: return "https://www.makemytrip.com"
+    if "google"    in il: return "https://www.google.com"
     return DEFAULT_NAVIGATE_URL
+
+
+def _extract_query(instruction: str) -> str:
+    try:
+        from rag_store import extract_search_term
+        return extract_search_term(instruction) or "search"
+    except Exception:
+        return "search"
+
+
+def _is_monitoring_plan(steps: List[Dict]) -> bool:
+    return any(s.get("action") == "start_monitoring" for s in steps)
 
 
 def _wants_images(instruction: str) -> bool:
     if not instruction:
         return False
     return bool(
-        re.search(r"\bimages?\b", instruction, re.IGNORECASE)
+        re.search(r"\bimages?\b",   instruction, re.IGNORECASE)
         or re.search(r"\bpictures?\b", instruction, re.IGNORECASE)
-        or re.search(r"\bphotos?\b", instruction, re.IGNORECASE)
-        or "images tab" in instruction.lower()
+        or re.search(r"\bphotos?\b",   instruction, re.IGNORECASE)
     )
 
 
@@ -108,19 +149,7 @@ def _wants_download(instruction: str) -> bool:
     )
 
 
-def _is_google_plan(plan: Dict, instruction: str) -> bool:
-    base = (plan.get("url") or "").lower()
-    if "google.com" in base:
-        return True
-    for step in plan.get("steps", []):
-        if step.get("action") == "navigate" and "google.com" in (step.get("url") or "").lower():
-            return True
-    return "google" in (instruction or "").lower()
-
-
-# ---------------------------------------------------------------------------
-# Per-step repair
-# ---------------------------------------------------------------------------
+# ── Per-step Repair ───────────────────────────────────────────────────────────
 
 def _repair_step(
     step: Dict[str, Any],
@@ -128,55 +157,47 @@ def _repair_step(
     instruction: str,
     issues: List[str],
 ) -> Optional[Dict[str, Any]]:
-    """
-    Repair a single step in place. Returns the repaired step,
-    or None if the step is unrecoverable and should be dropped.
-    """
     if not isinstance(step, dict):
         issues.append(f"step[{idx}]: not an object — dropped")
         return None
 
-    # --- action ---
     action = str(step.get("action", "")).strip().lower()
     if action not in VALID_ACTIONS:
         issues.append(f"step[{idx}]: invalid action '{action}' — dropped")
         return None
     step["action"] = action
 
-    # --- description ---
+    # Description
     if _is_blank(step.get("description")):
         step["description"] = f"Step {idx + 1}: {action}"
 
-    # --- per-action defaults ---
+    # Apply per-action defaults
     for k, v in ACTION_DEFAULTS.get(action, {}).items():
         step.setdefault(k, v)
 
-    # --- per-action validation ---
+    # ── navigate ──────────────────────────────────────────────────────────────
     if action == "navigate":
         url = _normalize_url(step.get("url", ""))
         if not url:
             fallback = _detect_intent_url(instruction)
-            issues.append(
-                f"step[{idx}]: navigate missing/invalid url '{step.get('url')}' "
-                f"— defaulted to {fallback}"
-            )
+            issues.append(f"step[{idx}]: navigate has invalid url — defaulted to {fallback}")
             url = fallback
         step["url"] = url
-        # selector/value/key are irrelevant for navigate
         step.pop("selector", None)
 
+    # ── fill ──────────────────────────────────────────────────────────────────
     elif action == "fill":
         if _is_blank(step.get("selector")):
             issues.append(f"step[{idx}]: fill missing selector — dropped")
             return None
-        if "value" not in step or step["value"] is None:
-            step["value"] = ""
+        step.setdefault("value", "")
 
+    # ── press ─────────────────────────────────────────────────────────────────
     elif action == "press":
-        key = step.get("key")
-        if _is_blank(key):
+        if _is_blank(step.get("key")):
             step["key"] = "Enter"
 
+    # ── wait ──────────────────────────────────────────────────────────────────
     elif action == "wait":
         try:
             step["duration"] = max(0, int(step.get("duration", 2000)))
@@ -184,16 +205,18 @@ def _repair_step(
             issues.append(f"step[{idx}]: invalid wait duration — defaulted to 2000ms")
             step["duration"] = 2000
 
+    # ── click / hover / assert / select / extract ─────────────────────────────
     elif action in ("click", "hover", "assert", "select", "extract"):
         if _is_blank(step.get("selector")):
             issues.append(f"step[{idx}]: {action} missing selector — dropped")
             return None
-        if action == "select" and "value" not in step:
-            step["value"] = ""
+        if action == "select":
+            step.setdefault("value", "")
         if action == "extract":
-            step.setdefault("variable", f"extracted_{idx + 1}")
+            step.setdefault("variable",  f"extracted_{idx + 1}")
             step.setdefault("attribute", "textContent")
 
+    # ── scroll ────────────────────────────────────────────────────────────────
     elif action == "scroll":
         try:
             step["amount"] = int(step.get("amount", 300))
@@ -202,32 +225,176 @@ def _repair_step(
         if step.get("direction") not in ("up", "down"):
             step["direction"] = "down"
 
-    elif action == "download":
-        # download has no required fields in our engine
-        pass
+    # ── search / search_products ──────────────────────────────────────────────
+    elif action in ("search", "search_products"):
+        if _is_blank(step.get("query")):
+            q = _extract_query(instruction)
+            step["query"] = q
+            issues.append(f"step[{idx}]: {action} missing query — set to '{q}'")
+        step.setdefault("platform", "amazon")
+
+    # ── apply_sort ────────────────────────────────────────────────────────────
+    elif action == "apply_sort":
+        step.setdefault("sort_type", "rating")
+        step.setdefault("platform",  "amazon")
+
+    # ── apply_price_filter ────────────────────────────────────────────────────
+    elif action == "apply_price_filter":
+        step.setdefault("max_price", 999999)
+        step.setdefault("min_price", 0)
+        step.setdefault("platform",  "amazon")
+
+    # ── apply_rating_filter ───────────────────────────────────────────────────
+    elif action == "apply_rating_filter":
+        step.setdefault("min_rating", 4.0)
+        step.setdefault("platform",   "amazon")
+
+    # ── click_product_index ───────────────────────────────────────────────────
+    elif action == "click_product_index":
+        step.setdefault("index",    1)
+        step.setdefault("platform", "amazon")
+
+    # ── click_product_name ────────────────────────────────────────────────────
+    elif action == "click_product_name":
+        if _is_blank(step.get("product_name")):
+            step["product_name"] = _extract_query(instruction)
+            issues.append(f"step[{idx}]: click_product_name missing product_name — extracted from instruction")
+        step.setdefault("platform", "amazon")
+
+    # ── select_variant ────────────────────────────────────────────────────────
+    elif action == "select_variant":
+        if _is_blank(step.get("variant")):
+            step["variant"] = ""
+            issues.append(f"step[{idx}]: select_variant missing variant")
+        step.setdefault("platform", "amazon")
+
+    # ── select_quantity ───────────────────────────────────────────────────────
+    elif action == "select_quantity":
+        try:
+            step["quantity"] = max(1, int(step.get("quantity", 1)))
+        except (TypeError, ValueError):
+            step["quantity"] = 1
+        step.setdefault("platform", "amazon")
+
+    # ── add_to_cart / buy_now ─────────────────────────────────────────────────
+    elif action in ("add_to_cart", "buy_now"):
+        try:
+            step["quantity"] = max(1, int(step.get("quantity", 1)))
+        except (TypeError, ValueError):
+            step["quantity"] = 1
+        step.setdefault("platform", "amazon")
+
+    # ── smart_find_and_add_best ───────────────────────────────────────────────
+    elif action == "smart_find_and_add_best":
+        step.setdefault("min_rating", 0.0)
+        step.setdefault("limit",      20)
+        step.setdefault("platform",   "amazon")
+
+    # ── search_images ─────────────────────────────────────────────────────────
+    elif action == "search_images":
+        if _is_blank(step.get("query")):
+            q = _extract_query(instruction)
+            step["query"] = q
+            issues.append(f"step[{idx}]: search_images missing query — set to '{q}'")
+
+    # ── click_google_image ────────────────────────────────────────────────────
+    elif action == "click_google_image":
+        step.setdefault("index", 1)
+
+    # ── download_highres — no required fields ─────────────────────────────────
+
+    # ── youtube_search ────────────────────────────────────────────────────────
+    elif action == "youtube_search":
+        if _is_blank(step.get("query")):
+            q = _extract_query(instruction)
+            step["query"] = q
+            issues.append(f"step[{idx}]: youtube_search missing query — set to '{q}'")
+        step.setdefault("skip_shorts", True)
+
+    # ── youtube_interact ──────────────────────────────────────────────────────
+    elif action == "youtube_interact":
+        if _is_blank(step.get("interaction")):
+            desc = step.get("description", "").lower()
+            if   "like"        in desc: step["interaction"] = "like"
+            elif "comment"     in desc: step["interaction"] = "open_comments"
+            elif "scroll"      in desc: step["interaction"] = "scroll_comments"
+            elif "fullscreen"  in desc: step["interaction"] = "fullscreen"
+            elif "subscribe"   in desc: step["interaction"] = "subscribe"
+            elif "settings"    in desc: step["interaction"] = "settings"
+            elif "mute"        in desc: step["interaction"] = "mute"
+            elif "pause"       in desc: step["interaction"] = "pause"
+            else:                       step["interaction"] = "like"
+            issues.append(f"step[{idx}]: youtube_interact missing interaction — defaulted to '{step['interaction']}'")
+
+    # ── smart_login ───────────────────────────────────────────────────────────
+    elif action == "smart_login":
+        if _is_blank(step.get("username")):
+            m = re.search(r'(?:username|user|email)\s+(\S+)', instruction, re.IGNORECASE)
+            step["username"] = m.group(1) if m else "testuser"
+            issues.append(f"step[{idx}]: smart_login missing username — set to '{step['username']}'")
+        if _is_blank(step.get("password")):
+            m = re.search(r'(?:password|pass|pwd)\s+(\S+)', instruction, re.IGNORECASE)
+            step["password"] = m.group(1) if m else "password123"
+            issues.append(f"step[{idx}]: smart_login missing password — set from instruction or default")
+
+    # ── compare_flights ───────────────────────────────────────────────────────
+    elif action == "compare_flights":
+        if _is_blank(step.get("origin")):
+            m = re.search(r'from\s+([A-Z]{3})', instruction, re.IGNORECASE)
+            step["origin"] = m.group(1).upper() if m else "DEL"
+            issues.append(f"step[{idx}]: compare_flights missing origin — set to '{step['origin']}'")
+        if _is_blank(step.get("destination")):
+            m = re.search(r'to\s+([A-Z]{3})', instruction, re.IGNORECASE)
+            step["destination"] = m.group(1).upper() if m else "BOM"
+            issues.append(f"step[{idx}]: compare_flights missing destination — set to '{step['destination']}'")
+        step.setdefault("date", "tomorrow")
+
+    # ── start_monitoring ──────────────────────────────────────────────────────
+    elif action == "start_monitoring":
+        if not step.get("monitors"):
+            il = instruction.lower()
+            if "ps5" in il:
+                monitor = {"type": "ecommerce", "id": "PS5",     "condition": "below",        "threshold": 45000, "action": "notify",   "interval": 30}
+            elif "tesla" in il:
+                monitor = {"type": "stock",     "id": "TSLA",    "condition": "drops_percent", "threshold": 5,     "action": "buy_now",  "interval": 30}
+            elif "bitcoin" in il or "btc" in il:
+                monitor = {"type": "crypto",    "id": "bitcoin", "condition": "below",         "threshold": 50000, "action": "notify",   "interval": 30}
+            elif "ethereum" in il or "eth" in il:
+                monitor = {"type": "crypto",    "id": "ethereum","condition": "below",         "threshold": 3000,  "action": "notify",   "interval": 30}
+            else:
+                monitor = {"type": "crypto",    "id": "bitcoin", "condition": "below",         "threshold": 50000, "action": "notify",   "interval": 30}
+                issues.append(f"step[{idx}]: start_monitoring missing monitors — added default bitcoin monitor")
+            step["monitors"] = [monitor]
+
+    # ── check_monitors / stop_monitoring — no required fields ─────────────────
+    # ── request_human_input ───────────────────────────────────────────────────
+    elif action == "request_human_input":
+        step.setdefault("prompt", "Human input required")
+
+    # ── provide_human_input ───────────────────────────────────────────────────
+    elif action == "provide_human_input":
+        step.setdefault("value", "")
 
     return step
 
 
-# ---------------------------------------------------------------------------
-# Plan-level enforcement
-# ---------------------------------------------------------------------------
+# ── Plan-level Enforcement ────────────────────────────────────────────────────
 
-def _ensure_first_step_is_navigate(
+def _ensure_first_step_navigate(
     steps: List[Dict],
     instruction: str,
     plan_url: Optional[str],
     issues: List[str],
 ) -> List[Dict]:
+    """Monitoring-only plans skip this; all others must start with navigate."""
+    if _is_monitoring_plan(steps):
+        return steps
     if steps and steps[0].get("action") == "navigate":
         return steps
+
     target = _normalize_url(plan_url or "") or _detect_intent_url(instruction)
     issues.append(f"plan: missing leading navigate — inserted navigate to {target}")
-    return [{
-        "action": "navigate",
-        "description": f"Navigate to {target}",
-        "url": target,
-    }] + steps
+    return [{"action": "navigate", "description": f"Navigate to {target}", "url": target}] + steps
 
 
 def _enforce_google_images_flow(
@@ -235,68 +402,31 @@ def _enforce_google_images_flow(
     instruction: str,
     issues: List[str],
 ) -> List[Dict]:
-    """
-    For Google-image instructions, ensure the canonical sequence after the
-    initial search exists:
-        ... press Enter → wait →
-        click Images tab → wait →
-        click first image → wait →
-        (download if requested)
-    """
     if not _wants_images(instruction):
         return steps
 
-    has_images_click = any(
-        s.get("action") == "click"
-        and (
-            "tbm=isch" in (s.get("selector") or "")
-            or "images" in (s.get("description") or "").lower()
-        )
-        for s in steps
-    )
-    has_image_pick = any(
-        s.get("action") == "click"
-        and (
-            "img" in (s.get("selector") or "").lower()
-            or "first image" in (s.get("description") or "").lower()
-        )
-        for s in steps
-    )
-    has_download = any(s.get("action") == "download" for s in steps)
-    wants_dl = _wants_download(instruction)
+    has_search_images    = any(s.get("action") == "search_images"    for s in steps)
+    has_download_highres = any(s.get("action") == "download_highres" for s in steps)
 
     appended: List[Dict] = []
 
-    if not has_images_click:
-        issues.append("plan: Google Images flow missing — appended Images-tab click")
+    if not has_search_images:
+        q = _extract_query(instruction)
+        issues.append("plan: images flow missing search_images — appended")
         appended += [
-            {"action": "click", "description": "Click Images tab",
-             "selector": "a[href*='tbm=isch']"},
-            {"action": "wait", "description": "Wait for image grid", "duration": 2000},
+            {"action": "search_images",    "description": f"Search images: {q}", "query": q},
+            {"action": "wait",             "description": "Wait for images",      "duration": 3000},
+            {"action": "click_google_image","description": "Click first image",   "index": 1},
         ]
 
-    if not has_image_pick:
-        issues.append("plan: Google Images flow missing — appended first-image click")
-        appended += [
-            {"action": "click", "description": "Click first image",
-             "selector": "img.Q4LuWd"},
-            {"action": "wait", "description": "Wait for image preview", "duration": 2000},
-        ]
+    if not has_download_highres and _wants_download(instruction):
+        issues.append("plan: download requested but missing download_highres — appended")
+        appended.append({"action": "download_highres", "description": "Download high-resolution image"})
 
-    if wants_dl and not has_download:
-        issues.append("plan: download requested but missing — appended download")
-        appended += [
-            {"action": "download", "description": "Download image"},
-        ]
-
-    if appended:
-        steps = steps + appended
-    return steps
+    return steps + appended
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+# ── Public API ────────────────────────────────────────────────────────────────
 
 def validate_and_repair_plan(
     plan: Optional[Dict[str, Any]],
@@ -308,14 +438,14 @@ def validate_and_repair_plan(
     Returns:
         (clean_plan, issues)
 
-    `clean_plan` always contains:
-        - "url"   : Optional[str]
-        - "steps" : List[Dict] with at least one navigate step
+    `clean_plan` always has:
+        - "steps": List[Dict]  (at least one safe step)
+        - "url":   Optional[str]
     """
     issues: List[str] = []
 
     if not isinstance(plan, dict):
-        issues.append("plan: not a dict — replaced with default navigate plan")
+        issues.append("plan: not a dict — replaced with empty plan")
         plan = {}
 
     raw_steps = plan.get("steps")
@@ -323,31 +453,38 @@ def validate_and_repair_plan(
         issues.append("plan: 'steps' missing or not a list — initialised empty")
         raw_steps = []
 
+    # Repair individual steps
     repaired: List[Dict] = []
     for idx, step in enumerate(raw_steps):
-        fixed = _repair_step(dict(step) if isinstance(step, dict) else step,
-                             idx, instruction, issues)
+        fixed = _repair_step(
+            dict(step) if isinstance(step, dict) else step,
+            idx, instruction, issues,
+        )
         if fixed is not None:
             repaired.append(fixed)
 
-    repaired = _ensure_first_step_is_navigate(
-        repaired, instruction, plan.get("url"), issues
-    )
+    # Plan-level rules
+    repaired = _ensure_first_step_navigate(repaired, instruction, plan.get("url"), issues)
 
-    if _is_google_plan({"url": plan.get("url"), "steps": repaired}, instruction):
+    # Google Images flow enforcement
+    il = instruction.lower()
+    if "google" in il or not any(
+        k in il for k in ["amazon", "flipkart", "youtube", "flight", "monitor"]
+    ):
         repaired = _enforce_google_images_flow(repaired, instruction, issues)
 
-    clean = {
-        "url": _normalize_url(plan.get("url") or "") or repaired[0].get("url"),
+    clean: Dict[str, Any] = {
+        "url":   _normalize_url(plan.get("url") or "")
+                 or (repaired[0].get("url") if repaired else None),
         "steps": repaired,
     }
-    # Preserve any extra metadata (e.g. _source) the caller set
+    # Preserve extra metadata (_source, etc.)
     for k, v in plan.items():
         if k not in clean:
             clean[k] = v
 
     if issues:
-        logger.info(f"[StepSchema] Plan repaired with {len(issues)} issue(s):")
+        logger.info(f"[StepSchema] Plan repaired ({len(issues)} issue(s)):")
         for msg in issues:
             logger.info(f"  • {msg}")
     else:
